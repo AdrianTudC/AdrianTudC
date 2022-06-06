@@ -19,16 +19,15 @@ description: >- # this means to ignore newlines until "baseurl:"
   I'm Adrian, I'm a developer and I'm trying to bind computers to my will to try make the world a better place.
 baseurl: "" # the subpath of your site, e.g. /blog
 url: "https://AdrianTudC.github.io" # the base hostname & protocol for your site, e.g. http://example.com
-github_username:  AdrianTudC
-domain: "AdrianTudC.github.io" 
+github_username: AdrianTudC
+domain: "AdrianTudC.github.io"
 
 # Build settings
 markdown: kramdown
-theme: jekyll-theme-minimal
+theme: minima
 plugins:
   - jekyll-feed
   - jemoji
-
 # Exclude from processing.
 # The following items will not be processed, by default. Create a custom list
 # to override the default setting.
