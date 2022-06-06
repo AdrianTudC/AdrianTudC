@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1"><!-- Begin Jekyll SEO tag v2.5.0 -->
+<title>Trying out DynamoDB | Thoughts between keystrokes</title>
+<meta name="generator" content="Jekyll v3.7.4" />
+<meta property="og:title" content="Trying out DynamoDB" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="This week at work I had to move some persistent data from browser’s localstorage to a database in order to make some user preferences available cross-device." />
+<meta property="og:description" content="This week at work I had to move some persistent data from browser’s localstorage to a database in order to make some user preferences available cross-device." />
+<link rel="canonical" href="http://localhost:4000/libs/2019/07/24/trying-dynamodb.html" />
+<meta property="og:url" content="http://localhost:4000/libs/2019/07/24/trying-dynamodb.html" />
+<meta property="og:site_name" content="Thoughts between keystrokes" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2019-07-24T09:04:02+02:00" />
+<script type="application/ld+json">
+{"url":"http://localhost:4000/libs/2019/07/24/trying-dynamodb.html","headline":"Trying out DynamoDB","dateModified":"2019-07-24T09:04:02+02:00","datePublished":"2019-07-24T09:04:02+02:00","description":"This week at work I had to move some persistent data from browser’s localstorage to a database in order to make some user preferences available cross-device.","@type":"BlogPosting","mainEntityOfPage":{"@type":"WebPage","@id":"http://localhost:4000/libs/2019/07/24/trying-dynamodb.html"},"@context":"http://schema.org"}</script>
+<!-- End Jekyll SEO tag -->
+<link rel="stylesheet" href="/assets/main.css"><link type="application/atom+xml" rel="alternate" href="http://localhost:4000/feed.xml" title="Thoughts between keystrokes" /></head>
+<body><header class="site-header" role="banner">
+
+  <div class="wrapper">
+<a class="site-title" rel="author" href="/">Thoughts between keystrokes</a><nav class="site-nav">
+        <input type="checkbox" id="nav-trigger" class="nav-trigger">
+        <label for="nav-trigger">
+          <span class="menu-icon">
+            <svg viewbox="0 0 18 15" width="18px" height="15px">
+              <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.032C17.335,0,18,0.665,18,1.484L18,1.484z M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.032C17.335,6.031,18,6.696,18,7.516L18,7.516z M18,13.516C18,14.335,17.335,15,16.516,15H1.484 C0.665,15,0,14.335,0,13.516l0,0c0-0.82,0.665-1.483,1.484-1.483h15.032C17.335,12.031,18,12.695,18,13.516L18,13.516z"></path>
+            </svg>
+          </span>
+        </label>
+
+        <div class="trigger"><a class="page-link" href="/about/">About</a></div>
+      </nav>
+</div>
+</header>
+<main class="page-content" aria-label="Content">
+      <div class="wrapper">
+        <article class="post h-entry" itemscope itemtype="http://schema.org/BlogPosting">
+
+  <header class="post-header">
+    <h1 class="post-title p-name" itemprop="name headline">Trying out DynamoDB</h1>
+    <p class="post-meta">
+      <time class="dt-published" datetime="2019-07-24T09:04:02+02:00" itemprop="datePublished">Jul 24, 2019
+      </time></p>
+  </header>
+
+  <div class="post-content e-content" itemprop="articleBody">
+    <p>This week at work I had to move some persistent data from browser’s localstorage to a database in order to make some user preferences available cross-device.</p>
+
+<p>Naturally the first question that popped up was: what database to use? Nosql was pretty much a no-brainer since I didn’t have any complicated data to keep, but what flavour of nosql? Me personally, I’m a big fan of mongoDB, I’ve been using it for 5 years now and I think it matured well, I would have also finished the implementation faster because I know the API (almost) inside-out. But due to some deployment-related restrictions I decided to give DynamoDB a try. After all, why not add another tool on my belt.</p>
+
+<p>But oh boy, I was in for a surprise.</p>
+
+<h2 id="the-lib-structure">The lib structure</h2>
+
+<p>I spent the first 30 minutes looking around and I found 2 kinds of code examples/documentations which confused the hell out of me. Both documentations were using the <code class="highlighter-rouge">AWS-SDK</code> npm package but one was using a lower-level API and the other one was instantiationg a <code class="highlighter-rouge">documentClient</code> object which was used as a handler. I also bumped into another deprecated git <a href="https://github.com/awslabs/dynamodb-document-js-sdk">repo</a> but I just left that alone since I already had a handful of choices (actually two <img class="emoji" title=":v:" alt=":v:" src="https://github.githubassets.com/images/icons/emoji/unicode/270c.png" height="20" width="20">).</p>
+
+<p>The higher level API:</p>
+
+<figure class="highlight"><pre><code class="language-javascript" data-lang="javascript"><span class="k">import</span> <span class="o">*</span> <span class="k">as</span> <span class="nx">AWS</span> <span class="k">from</span> <span class="s1">'aws-sdk'</span><span class="p">;</span>
+<span class="nx">AWS</span><span class="p">.</span><span class="nx">config</span><span class="p">.</span><span class="nx">update</span><span class="p">({</span>
+  <span class="na">region</span><span class="p">:</span> <span class="s1">''</span><span class="p">,</span> <span class="na">accessKeyId</span><span class="p">:</span> <span class="s1">''</span><span class="p">,</span> <span class="s1">'secretAccessKey'</span><span class="p">:</span> <span class="s1">''</span>
+<span class="p">});</span>
+<span class="kd">const</span> <span class="nx">docClient</span> <span class="o">=</span> <span class="k">new</span> <span class="nx">AWS</span><span class="p">.</span><span class="nx">DynamoDB</span><span class="p">.</span><span class="nx">DocumentClient</span><span class="p">();</span></code></pre></figure>
+
+<p>And the lower level:</p>
+
+<figure class="highlight"><pre><code class="language-javascript" data-lang="javascript"><span class="k">import</span> <span class="o">*</span> <span class="k">as</span> <span class="nx">AWS</span> <span class="k">from</span> <span class="s1">'aws-sdk'</span><span class="p">;</span>
+<span class="nx">AWS</span><span class="p">.</span><span class="nx">config</span><span class="p">.</span><span class="nx">update</span><span class="p">({</span>
+  <span class="na">region</span><span class="p">:</span> <span class="s1">''</span><span class="p">,</span> <span class="na">accessKeyId</span><span class="p">:</span> <span class="s1">''</span><span class="p">,</span> <span class="s1">'secretAccessKey'</span><span class="p">:</span> <span class="s1">''</span>
+<span class="p">});</span>
+<span class="kd">const</span> <span class="nx">docClient</span> <span class="o">=</span> <span class="k">new</span> <span class="nx">AWS</span><span class="p">.</span><span class="nx">DynamoDB</span><span class="p">();</span></code></pre></figure>
+
+<p>The difference is subtle but it affects how you are using the API. And to be honest I didn’t find the docs to be very upfront mentioning this difference.</p>
+
+<p>In the end I stuck with the lower level API because I prefer barebone stuff and because i’m a control freak <img class="emoji" title=":grimacing:" alt=":grimacing:" src="https://github.githubassets.com/images/icons/emoji/unicode/1f62c.png" height="20" width="20">. (Later I would find out that I didn’t really get any kind of extra control)</p>
+
+<h2 id="crud">CRUD</h2>
+
+<p>With the initialization out of the way, I thought that it’s gonna be easy peasy to just create some data, make a getter for it and an update function. But again, I was wrong and it took me a while before I got to understand how the querying works.</p>
+
+<p>Another thing that is not really emphasized (especially when looking up code examples) is that the lower level API not only has different methods than the <code class="highlighter-rouge">DocumentClient</code> API, but requires you to have a different structure in your query. You have to specify yourself each data type that your fields will contain, which I find completely weird and unnecessary for a nosql database but I did my best to see past my personal beliefs and went on with it.</p>
+
+<p>Let’s see an example of a getter:</p>
+
+<figure class="highlight"><pre><code class="language-javascript" data-lang="javascript"><span class="kd">const</span> <span class="nx">params</span> <span class="o">=</span> <span class="p">{</span>
+  <span class="na">TableName</span> <span class="p">:</span> <span class="s1">'Table'</span><span class="p">,</span>
+  <span class="na">Key</span><span class="p">:</span> <span class="p">{</span>
+    <span class="na">someKey</span><span class="p">:</span> <span class="s1">'pretty cool string'</span>
+  <span class="p">}</span>
+<span class="p">};</span>
+<span class="c1">// this gives back the entire document that has the primary key with the value 'pretty cool string'</span></code></pre></figure>
+
+<p>This looks decent, nothing out of the ordinary.</p>
+
+<p>Onward to inserting a value:</p>
+
+<figure class="highlight"><pre><code class="language-javascript" data-lang="javascript"><span class="kd">const</span> <span class="nx">params</span> <span class="o">=</span> <span class="p">{</span>
+  <span class="na">TableName</span> <span class="p">:</span> <span class="s1">'Table'</span><span class="p">,</span>
+  <span class="na">Key</span> <span class="p">:</span> <span class="p">{</span>
+    <span class="na">someKEy</span><span class="p">:</span> <span class="s1">'pretty cool string'</span>
+  <span class="p">},</span>
+  <span class="c1">// so far the selector part is the same as above</span>
+  <span class="na">ConditionExpression</span><span class="p">:</span> <span class="s1">'ADD #COLUMN :VALUE'</span><span class="p">,</span>
+  <span class="na">ExpressionAttributeNames</span><span class="p">:</span> <span class="p">{</span>
+    <span class="s1">'COLUMN'</span> <span class="p">:</span> <span class="s1">'cool_column'</span>
+  <span class="p">},</span>
+  <span class="na">ExpressionAttributeValues</span><span class="p">:</span> <span class="p">{</span>
+    <span class="s1">'VALUE'</span> <span class="p">:</span> <span class="p">{</span>
+      <span class="na">S</span><span class="p">:</span> <span class="s1">'some crazy value'</span>
+    <span class="p">}</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="c1">// this adds a string item to a string set</span></code></pre></figure>
+
+<p>Woah! This seems… too much, but for longer queries it can be useful to avoid huge one liners (altough I prefer mongo’s json-style querying rather than this verbose one). To be honest if you don’t want to use <code class="highlighter-rouge">ExpressionAttributeNames</code> and <code class="highlighter-rouge">ExpressionAttributeValues</code>,  <code class="highlighter-rouge">ADD mycolumnname ${myvalue}</code> does work (for non-list data types). The docs show this expanded way of writing it as being the default (in fact, the docs definition looks <a href="https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/DynamoDB.html#putItem-property">scary and intimidating</a>).</p>
+
+<h2 id="not-the-best-not-the-worst">Not the best not the worst</h2>
+
+<p>Of course it’s not all a mumbo jumbo and everything makes sense in a funky way. You can group primitive types using lists (type <code class="highlighter-rouge">L</code>) and it would look like this in a table: <code class="highlighter-rouge">[ {S: 'some string'}, {N: 42} ]</code> which is kinda weird. There is another type called Set that looks like your average array when you look at it: <code class="highlighter-rouge">['some string', 'another boring string']</code> but this is actually a set and it has the type defined as <code class="highlighter-rouge">SS</code> if it’s a set of strings or <code class="highlighter-rouge">SN</code> for a set of numbers and so on…</p>
+
+<p>These two types also use different syntax for operations. Lists use the <code class="highlighter-rouge">SET</code> keyword (ironically) while sets use the <code class="highlighter-rouge">ADD</code> and <code class="highlighter-rouge">REMOVE</code> keywords. You can use the <code class="highlighter-rouge">REMOVE</code> keyword for lists also, but you need to know what index the item has in your list, and I believe in most cases that implies that you need to query beforehand and count yourself which seems tedious. There are also a bunch of helper functions that you can find in the docs like <code class="highlighter-rouge">list_append(&lt;list&gt;, &lt;item&gt;)</code> which you use to add items to a list.</p>
+
+<p>In the end I’d say that for super basic stuff DynamoDB suffices and it’s pretty easy to get it up and running (provided you bump into the proper docs and examples) but for a more ample project I would still use mongoDB <img class="emoji" title=":robot:" alt=":robot:" src="https://github.githubassets.com/images/icons/emoji/unicode/1f916.png" height="20" width="20">.</p>
+
+  </div>
+<a class="u-url" href="/libs/2019/07/24/trying-dynamodb.html" hidden></a>
+</article>
+
+      </div>
+    </main><footer class="site-footer h-card">
+  <data class="u-url" href="/"></data>
+
+  <div class="wrapper">
+
+    <h2 class="footer-heading">Thoughts between keystrokes</h2>
+
+    <div class="footer-col-wrapper">
+      <div class="footer-col footer-col-1">
+        <ul class="contact-list">
+          <li class="p-name">Thoughts between keystrokes</li>
+<li><a class="u-email" href="mailto:adrian%5Bdot%5Dedeph%5B@t%5Dgoogle's%20mail%20service">adrian[dot]edeph[@t]google's mail service</a></li>
+</ul>
+      </div>
+
+      <div class="footer-col footer-col-2">
+<ul class="social-media-list">
+<li><a href="https://github.com/Edeph"><svg class="svg-icon"><use xlink:href="/assets/minima-social-icons.svg#github"></use></svg> <span class="username">Edeph</span></a></li>
+<li><a href="https://www.twitter.com/TudorAdrianC"><svg class="svg-icon"><use xlink:href="/assets/minima-social-icons.svg#twitter"></use></svg> <span class="username">TudorAdrianC</span></a></li>
+</ul>
+</div>
+
+      <div class="footer-col footer-col-3">
+        <p>I'm Adrian, I'm a developer and I'm trying to bind computers to my will to try make the world a better place.</p>
+      </div>
+    </div>
+
+  </div>
+
+</footer>
+</body>
+
+</html>
